@@ -1,27 +1,43 @@
+# Feito para o Dokploy: o Traefik do Dokploy cuida do domínio e do HTTPS.
+# KUMA_DOMAIN e PAINEL_ORIGIN vêm da aba Environment do serviço.
 services:
   uptime-kuma:
     image: louislam/uptime-kuma:1
     restart: always
     volumes:
-      # Banco SQLite com todo o histórico. Inclua esta pasta no backup da VPS.
-      - ./data:/app/data
+      # Banco SQLite com todo o histórico. Volume nomeado: sobrevive a redeploys.
+      - kuma-data:/app/data
+    networks:
+      - dokploy-network
+    labels:
+      - traefik.enable=true
+      - traefik.http.services.uptime-kuma.loadbalancer.server.port=3001
 
-  caddy:
-    image: caddy:2
-    restart: always
-    ports:
-      - "80:80"
-      - "443:443"
-    environment:
-      KUMA_DOMAIN: ${KUMA_DOMAIN}
-      PAINEL_ORIGIN: ${PAINEL_ORIGIN}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      - uptime-kuma
+      # Interface do Kuma (admin).
+      - traefik.http.routers.uptime-kuma.rule=Host(`${KUMA_DOMAIN}`)
+      - traefik.http.routers.uptime-kuma.entrypoints=websecure
+      - traefik.http.routers.uptime-kuma.tls.certresolver=letsencrypt
+      - traefik.http.routers.uptime-kuma.service=uptime-kuma
+
+      # API pública da Status Page: mesma origem, com CORS liberado para o painel.
+      - traefik.http.routers.uptime-kuma-api.rule=Host(`${KUMA_DOMAIN}`) && PathPrefix(`/api/status-page/`)
+      - traefik.http.routers.uptime-kuma-api.entrypoints=websecure
+      - traefik.http.routers.uptime-kuma-api.tls.certresolver=letsencrypt
+      - traefik.http.routers.uptime-kuma-api.service=uptime-kuma
+      - traefik.http.routers.uptime-kuma-api.middlewares=uptime-kuma-cors
+      - traefik.http.middlewares.uptime-kuma-cors.headers.accesscontrolalloworiginlist=${PAINEL_ORIGIN}
+      - traefik.http.middlewares.uptime-kuma-cors.headers.accesscontrolallowmethods=GET,OPTIONS
+      - traefik.http.middlewares.uptime-kuma-cors.headers.addvaryheader=true
+
+      # HTTP -> HTTPS.
+      - traefik.http.routers.uptime-kuma-http.rule=Host(`${KUMA_DOMAIN}`)
+      - traefik.http.routers.uptime-kuma-http.entrypoints=web
+      - traefik.http.routers.uptime-kuma-http.middlewares=uptime-kuma-https
+      - traefik.http.middlewares.uptime-kuma-https.redirectscheme.scheme=https
 
 volumes:
-  caddy_data:
-  caddy_config:
+  kuma-data:
+
+networks:
+  dokploy-network:
+    external: true

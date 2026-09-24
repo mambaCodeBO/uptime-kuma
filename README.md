@@ -9,28 +9,26 @@ que lê a Status Page pública do Kuma e mostra o "Uptime 24h" em cada card. Se 
 Kuma cair ou travar, o painel volta sozinho a checar direto do navegador.
 
 ```
-VPS: Caddy (HTTPS + CORS) → Uptime Kuma → SQLite (./data)
-                                 ▲
+Dokploy: Traefik (HTTPS + CORS) → Uptime Kuma → SQLite (volume kuma-data)
+                                      ▲
 Painel (Render) ── GET /api/status-page/heartbeat/painel
 ```
 
-## Subir na VPS
+## Subir no Dokploy
 
-Pré-requisitos: Docker com Compose, portas 80/443 livres e um DNS
-(ex.: `status.mambaads.com.br`) apontando para a VPS.
+1. **DNS:** crie um registro A `status.mambaads.com.br` → IP da VPS do Dokploy.
+2. **Dokploy:** Project → Create Service → **Compose** (tipo Docker Compose).
+   - Provider: GitHub, este repo, branch `main`, Compose Path `./docker-compose.yml`.
+3. **Environment:** cole o conteúdo do `.env.example` com os valores reais
+   (`KUMA_DOMAIN` e `PAINEL_ORIGIN`).
+4. **Deploy.** Não use a aba Domains: o domínio, o HTTPS (Let's Encrypt) e o
+   CORS já estão nas labels do Traefik no `docker-compose.yml`.
+5. Abra `https://<KUMA_DOMAIN>`. O certificado pode levar alguns segundos na
+   primeira vez.
 
-```bash
-git clone <este repo> uptime-kuma && cd uptime-kuma
-cp .env.example .env   # preencha KUMA_DOMAIN e PAINEL_ORIGIN
-docker compose up -d
-```
-
-O Caddy emite o certificado HTTPS sozinho na primeira requisição.
-
-**Já tem Nginx/Caddy nas portas 80/443?** Remova o serviço `caddy` do compose,
-exponha o Kuma com `ports: ["127.0.0.1:3001:3001"]` e replique no seu proxy o
-que o `Caddyfile` faz: proxy para a porta 3001 (com WebSocket) e o header
-`Access-Control-Allow-Origin: <PAINEL_ORIGIN>` nas rotas `/api/status-page/*`.
+Fora do Dokploy (Docker puro), é preciso outro proxy na frente fazendo o mesmo
+que as labels: HTTPS, proxy para a porta 3001 (com WebSocket) e o header
+`Access-Control-Allow-Origin: <PAINEL_ORIGIN>` em `/api/status-page/*`.
 
 ## Configurar (uma vez)
 
@@ -77,9 +75,9 @@ Para testar a API: `curl https://<KUMA_DOMAIN>/api/status-page/heartbeat/painel`
 
 ## Operação
 
-- **Backup:** todo o histórico fica em `./data` (SQLite). Inclua essa pasta no
-  backup da VPS.
-- **Atualizar:** `docker compose pull && docker compose up -d`.
-- **Logs:** `docker compose logs -f uptime-kuma`.
+- **Backup:** todo o histórico fica no volume `kuma-data` (SQLite). Configure o
+  backup do volume no Dokploy (Volume Backups) ou no backup da VPS.
+- **Atualizar:** Redeploy no Dokploy (a tag `:1` puxa a versão 1.x mais nova).
+- **Logs:** aba Logs do serviço no Dokploy.
 - **Kuma fora do ar:** o painel mostra "Monitor 24h indisponível" e segue
   funcionando no modo local até o Kuma voltar.
