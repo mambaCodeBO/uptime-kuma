@@ -1,5 +1,5 @@
 # Deploy no Dokploy (Compose). Domínio e HTTPS ficam na aba Domains:
-# Service Name "uptime-kuma", Container Port 3001.
+# Service Name "uptime-kuma", Host uptime-kuma.mambanest.com.br, Container Port 3001.
 services:
   uptime-kuma:
     image: louislam/uptime-kuma:1
@@ -7,6 +7,26 @@ services:
     volumes:
       # Banco SQLite com todo o histórico. Volume nomeado: sobrevive a redeploys.
       - kuma-data:/app/data
+    networks:
+      - dokploy-network
+    labels:
+      # Rota extra só para a API da Status Page, com CORS liberado para o painel
+      # (o Kuma não manda esse header em produção). A regra é mais longa que a
+      # da aba Domains, então o Traefik dá prioridade a ela nesses caminhos.
+      - traefik.enable=true
+      - traefik.http.routers.kuma-status-api.rule=Host(`uptime-kuma.mambanest.com.br`) && PathPrefix(`/api/status-page/`)
+      - traefik.http.routers.kuma-status-api.entrypoints=websecure
+      - traefik.http.routers.kuma-status-api.tls.certresolver=letsencrypt
+      - traefik.http.routers.kuma-status-api.service=kuma-status-api
+      - traefik.http.routers.kuma-status-api.middlewares=kuma-cors
+      - traefik.http.services.kuma-status-api.loadbalancer.server.port=3001
+      - traefik.http.middlewares.kuma-cors.headers.accesscontrolalloworiginlist=https://painelhealthcheck.onrender.com
+      - traefik.http.middlewares.kuma-cors.headers.accesscontrolallowmethods=GET,OPTIONS
+      - traefik.http.middlewares.kuma-cors.headers.addvaryheader=true
 
 volumes:
   kuma-data:
+
+networks:
+  dokploy-network:
+    external: true

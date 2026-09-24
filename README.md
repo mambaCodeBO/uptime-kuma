@@ -9,10 +9,10 @@ que lê a Status Page pública do Kuma e mostra o "Uptime 24h" em cada card. Se 
 Kuma cair ou travar, o painel volta sozinho a checar direto do navegador.
 
 ```
-Navegador → painelhealthcheck.onrender.com/kuma/*   (Rewrite do Render, mesma origem: sem CORS)
-                         │
-                         ▼
-Dokploy: Traefik (aba Domains, HTTPS) → Uptime Kuma → SQLite (volume kuma-data)
+Painel (painelhealthcheck.onrender.com)
+   │  GET https://uptime-kuma.mambanest.com.br/api/status-page/heartbeat/painel
+   ▼
+Dokploy: Traefik (aba Domains + CORS) → Uptime Kuma → SQLite (volume kuma-data)
 ```
 
 ## Subir no Dokploy
@@ -28,29 +28,28 @@ Dokploy: Traefik (aba Domains, HTTPS) → Uptime Kuma → SQLite (volume kuma-da
 4. **Deploy** e abra `https://uptime-kuma.mambanest.com.br`. O certificado pode
    levar alguns segundos na primeira vez.
 
+**CORS:** o Kuma não libera o painel a ler a API em produção. O
+`docker-compose.yml` cria uma rota extra do Traefik só para `/api/status-page/*`
+que adiciona o header `Access-Control-Allow-Origin` para
+`https://painelhealthcheck.onrender.com`. Se o domínio do Kuma ou do painel
+mudar, atualize as labels no compose.
+
 ## Ligar no painel (Render)
 
-O painel não chama o Kuma direto do navegador: o Render repassa `/kuma/*` para
-o Kuma. Assim não existe CORS a configurar.
-
-1. **Redirects/Rewrites → Add Rule:**
-   - Source: `/kuma/*`
-   - Destination: `https://uptime-kuma.mambanest.com.br/*`
-   - Action: **Rewrite**
-
-   Se houver uma regra genérica `/*` → `/index.html`, esta precisa ficar **acima** dela.
-2. **Environment:**
+1. **Environment:**
    ```
-   VITE_KUMA_URL=/kuma
+   VITE_KUMA_URL=https://uptime-kuma.mambanest.com.br
    VITE_KUMA_SLUG=painel
    ```
-3. **Manual Deploy.**
+2. **Manual Deploy.**
 
-Para testar: `curl https://painelhealthcheck.onrender.com/kuma/api/status-page/heartbeat/painel`.
+Para testar o CORS:
+`curl -i -H "Origin: https://painelhealthcheck.onrender.com" https://uptime-kuma.mambanest.com.br/api/status-page/heartbeat/painel`
+deve trazer `Access-Control-Allow-Origin: https://painelhealthcheck.onrender.com`.
 
 ## Configurar (uma vez)
 
-1. Acesse `https://<KUMA_DOMAIN>` e crie o usuário admin.
+1. Acesse `https://uptime-kuma.mambanest.com.br` e crie o usuário admin.
 2. Crie um monitor **HTTP(s)** para cada card do painel. Use Heartbeat Interval
    de 60s e Retries 2 (evita falso positivo).
 3. Crie uma **Status Page** com slug `painel` e adicione todos os monitores.
