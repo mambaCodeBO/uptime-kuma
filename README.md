@@ -9,26 +9,44 @@ que lê a Status Page pública do Kuma e mostra o "Uptime 24h" em cada card. Se 
 Kuma cair ou travar, o painel volta sozinho a checar direto do navegador.
 
 ```
-Dokploy: Traefik (HTTPS + CORS) → Uptime Kuma → SQLite (volume kuma-data)
-                                      ▲
-Painel (Render) ── GET /api/status-page/heartbeat/painel
+Navegador → painelhealthcheck.onrender.com/kuma/*   (Rewrite do Render, mesma origem: sem CORS)
+                         │
+                         ▼
+Dokploy: Traefik (aba Domains, HTTPS) → Uptime Kuma → SQLite (volume kuma-data)
 ```
 
 ## Subir no Dokploy
 
-1. **DNS:** crie um registro A `uptime-kuma.mambanest.com.br` → IP da VPS do Dokploy.
-2. **Dokploy:** Project → Create Service → **Compose** (tipo Docker Compose).
+1. **DNS:** registro A `uptime-kuma.mambanest.com.br` → IP da VPS do Dokploy.
+2. **Create Service → Compose** (tipo Docker Compose, não Stack).
    - Provider: GitHub, este repo, branch `main`, Compose Path `./docker-compose.yml`.
-3. **Environment:** cole o conteúdo do `.env.example` com os valores reais
-   (`KUMA_DOMAIN` e `PAINEL_ORIGIN`).
-4. **Deploy.** Não use a aba Domains: o domínio, o HTTPS (Let's Encrypt) e o
-   CORS já estão nas labels do Traefik no `docker-compose.yml`.
-5. Abra `https://<KUMA_DOMAIN>`. O certificado pode levar alguns segundos na
-   primeira vez.
+3. **Aba Domains → Add Domain:**
+   - Service Name: `uptime-kuma`
+   - Host: `uptime-kuma.mambanest.com.br`
+   - Path: `/` · Container Port: `3001`
+   - HTTPS: ligado · Certificate: Let's Encrypt
+4. **Deploy** e abra `https://uptime-kuma.mambanest.com.br`. O certificado pode
+   levar alguns segundos na primeira vez.
 
-Fora do Dokploy (Docker puro), é preciso outro proxy na frente fazendo o mesmo
-que as labels: HTTPS, proxy para a porta 3001 (com WebSocket) e o header
-`Access-Control-Allow-Origin: <PAINEL_ORIGIN>` em `/api/status-page/*`.
+## Ligar no painel (Render)
+
+O painel não chama o Kuma direto do navegador: o Render repassa `/kuma/*` para
+o Kuma. Assim não existe CORS a configurar.
+
+1. **Redirects/Rewrites → Add Rule:**
+   - Source: `/kuma/*`
+   - Destination: `https://uptime-kuma.mambanest.com.br/*`
+   - Action: **Rewrite**
+
+   Se houver uma regra genérica `/*` → `/index.html`, esta precisa ficar **acima** dela.
+2. **Environment:**
+   ```
+   VITE_KUMA_URL=/kuma
+   VITE_KUMA_SLUG=painel
+   ```
+3. **Manual Deploy.**
+
+Para testar: `curl https://painelhealthcheck.onrender.com/kuma/api/status-page/heartbeat/painel`.
 
 ## Configurar (uma vez)
 
@@ -61,17 +79,6 @@ título do card (maiúsculas não importam). Para usar outro nome, coloque
 
 Card novo no painel = monitor novo aqui, com o mesmo nome. Enquanto não existir,
 o card continua sendo checado pelo navegador.
-
-## Ligar no painel
-
-No Render (variáveis de build do painel) e depois um novo deploy:
-
-```
-VITE_KUMA_URL=https://uptime-kuma.mambanest.com.br
-VITE_KUMA_SLUG=painel
-```
-
-Para testar a API: `curl https://<KUMA_DOMAIN>/api/status-page/heartbeat/painel`.
 
 ## Operação
 

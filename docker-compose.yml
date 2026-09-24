@@ -1,5 +1,5 @@
-# Feito para o Dokploy: o Traefik do Dokploy cuida do domínio e do HTTPS.
-# KUMA_DOMAIN e PAINEL_ORIGIN vêm da aba Environment do serviço.
+# Deploy no Dokploy (Compose). Domínio e HTTPS ficam na aba Domains:
+# Service Name "uptime-kuma", Container Port 3001.
 services:
   uptime-kuma:
     image: louislam/uptime-kuma:1
@@ -7,37 +7,6 @@ services:
     volumes:
       # Banco SQLite com todo o histórico. Volume nomeado: sobrevive a redeploys.
       - kuma-data:/app/data
-    networks:
-      - dokploy-network
-    labels:
-      - traefik.enable=true
-      - traefik.http.services.uptime-kuma.loadbalancer.server.port=3001
-
-      # Interface do Kuma (admin).
-      - traefik.http.routers.uptime-kuma.rule=Host(`${KUMA_DOMAIN}`)
-      - traefik.http.routers.uptime-kuma.entrypoints=websecure
-      - traefik.http.routers.uptime-kuma.tls.certresolver=letsencrypt
-      - traefik.http.routers.uptime-kuma.service=uptime-kuma
-
-      # API pública da Status Page: mesma origem, com CORS liberado para o painel.
-      - traefik.http.routers.uptime-kuma-api.rule=Host(`${KUMA_DOMAIN}`) && PathPrefix(`/api/status-page/`)
-      - traefik.http.routers.uptime-kuma-api.entrypoints=websecure
-      - traefik.http.routers.uptime-kuma-api.tls.certresolver=letsencrypt
-      - traefik.http.routers.uptime-kuma-api.service=uptime-kuma
-      - traefik.http.routers.uptime-kuma-api.middlewares=uptime-kuma-cors
-      - traefik.http.middlewares.uptime-kuma-cors.headers.accesscontrolalloworiginlist=${PAINEL_ORIGIN}
-      - traefik.http.middlewares.uptime-kuma-cors.headers.accesscontrolallowmethods=GET,OPTIONS
-      - traefik.http.middlewares.uptime-kuma-cors.headers.addvaryheader=true
-
-      # HTTP -> HTTPS.
-      - traefik.http.routers.uptime-kuma-http.rule=Host(`${KUMA_DOMAIN}`)
-      - traefik.http.routers.uptime-kuma-http.entrypoints=web
-      - traefik.http.routers.uptime-kuma-http.middlewares=uptime-kuma-https
-      - traefik.http.middlewares.uptime-kuma-https.redirectscheme.scheme=https
 
 volumes:
   kuma-data:
-
-networks:
-  dokploy-network:
-    external: true
