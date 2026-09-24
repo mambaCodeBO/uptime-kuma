@@ -1,0 +1,27 @@
+services:
+  uptime-kuma:
+    image: louislam/uptime-kuma:1
+    restart: always
+    volumes:
+      # Banco SQLite com todo o histórico. Inclua esta pasta no backup da VPS.
+      - ./data:/app/data
+
+  caddy:
+    image: caddy:2
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      KUMA_DOMAIN: ${KUMA_DOMAIN}
+      PAINEL_ORIGIN: ${PAINEL_ORIGIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - uptime-kuma
+
+volumes:
+  caddy_data:
+  caddy_config:
