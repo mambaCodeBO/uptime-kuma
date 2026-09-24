@@ -16,7 +16,7 @@ Painel (Render) ── GET /api/status-page/heartbeat/painel
 
 ## Subir no Dokploy
 
-1. **DNS:** crie um registro A `status.mambaads.com.br` → IP da VPS do Dokploy.
+1. **DNS:** crie um registro A `uptime-kuma.mambanest.com.br` → IP da VPS do Dokploy.
 2. **Dokploy:** Project → Create Service → **Compose** (tipo Docker Compose).
    - Provider: GitHub, este repo, branch `main`, Compose Path `./docker-compose.yml`.
 3. **Environment:** cole o conteúdo do `.env.example` com os valores reais
@@ -67,7 +67,7 @@ o card continua sendo checado pelo navegador.
 No Render (variáveis de build do painel) e depois um novo deploy:
 
 ```
-VITE_KUMA_URL=https://status.mambaads.com.br
+VITE_KUMA_URL=https://uptime-kuma.mambanest.com.br
 VITE_KUMA_SLUG=painel
 ```
 
